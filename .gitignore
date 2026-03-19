@@ -1,0 +1,25 @@
+node_modules
+.next
+out
+dist
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Env
+.env
+
+# Editor
+.cursor/
+.idea/
+.vscode/
+
+# Logs
+*.log
+
