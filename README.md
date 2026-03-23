@@ -102,6 +102,25 @@ docker compose up --build
 
 The system seeds demo templates, a demo workspace, and one demo workflow run (awaiting approval) on first startup.
 
+## Seeded Demo Workflow (In-App)
+
+On first startup, the backend seeds a complete demo scenario in the project data model:
+
+- Workspace: `Demo Workspace`
+- Workflow: `AgentOps Demo`
+- Seeded run state: `awaiting_approval`
+- Includes tasks, assignments, artifacts, activity logs, and one pending approval checkpoint
+
+In the app:
+
+1. Open `http://localhost:3000/dashboard`.
+2. Open `Demo Workspace`.
+3. Click `Open Demo Run` in the "Demo Workflow Ready" panel.
+4. Inspect generated artifacts and activity logs.
+5. Submit an approval decision to complete or reject the run.
+
+This gives a fast end-to-end walkthrough without creating data manually.
+
 ## Demo Authentication
 
 For local/demo purposes the API uses a simple bearer token (`API_AUTH_TOKEN` in `.env`) plus an `x-user-id` header.

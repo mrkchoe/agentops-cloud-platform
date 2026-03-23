@@ -35,6 +35,9 @@ export default function WorkspacePage({ params }: { params: { workspaceId: strin
     };
   }, [workspaceId]);
 
+  const demoWorkflow = workflows.find((w) => w.name === "AgentOps Demo");
+  const demoRun = demoWorkflow ? runs.find((r) => r.workflow_id === demoWorkflow.id) : undefined;
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -54,6 +57,38 @@ export default function WorkspacePage({ params }: { params: { workspaceId: strin
       </div>
 
       {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+      {demoWorkflow && (
+        <div className="rounded-lg border border-brand-200 bg-brand-50/60 p-4 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-brand-900">Demo Workflow Ready</div>
+              <div className="mt-1 text-sm text-brand-900/90">
+                A seeded workflow is available for a quick walkthrough of planning, routing, review, and approval gating.
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {demoRun && (
+                <Link
+                  className="rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700"
+                  href={`/workspaces/${workspaceId}/workflows/${demoWorkflow.id}/runs/${demoRun.id}`}
+                >
+                  Open Demo Run
+                </Link>
+              )}
+              <Link
+                className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50"
+                href={`/workspaces/${workspaceId}/workflows/new`}
+              >
+                Clone Demo Idea
+              </Link>
+            </div>
+          </div>
+          <div className="mt-2 text-xs text-brand-900/80">
+            {demoRun ? `Current demo run status: ${demoRun.status.replaceAll("_", " ")}.` : "Open Workflow Builder to start a new run from this demo workflow."}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-lg border bg-white p-4 shadow-sm">
