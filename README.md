@@ -137,15 +137,6 @@ The frontend container injects these headers automatically via `NEXT_PUBLIC_API_
 5. Approve in the run detail screen:
    - Finalize executes and the final artifact is persisted.
 
-## Screenshots
-
-Placeholders:
-
-- Dashboard overview
-- Workspace agent management
-- Workflow builder
-- Run detail with approval queue + activity log
-
 ## Future Improvements
 
 - Add workspace-level run listing filters (status, time range)
