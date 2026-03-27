@@ -10,6 +10,7 @@ from sqlalchemy import (
     JSON,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -64,6 +65,62 @@ class CheckpointKind(str, enum.Enum):
     FINAL_DELIVERABLE = "final_deliverable"
 
 
+class ConversationType(str, enum.Enum):
+    DIRECT = "direct"
+    GROUP = "group"
+    WORKFLOW_LINKED = "workflow_linked"
+
+
+class ConversationStatus(str, enum.Enum):
+    OPEN = "open"
+    ARCHIVED = "archived"
+    CLOSED = "closed"
+
+
+class ParticipantType(str, enum.Enum):
+    USER = "user"
+    AGENT = "agent"
+    SYSTEM = "system"
+    EXTERNAL = "external"
+
+
+class MessageSenderType(str, enum.Enum):
+    USER = "user"
+    AGENT = "agent"
+    SYSTEM = "system"
+    EXTERNAL = "external"
+
+
+class MessageDirection(str, enum.Enum):
+    INBOUND = "inbound"
+    OUTBOUND = "outbound"
+    INTERNAL = "internal"
+
+
+class MessageChannel(str, enum.Enum):
+    WEB = "web"
+    WHATSAPP = "whatsapp"
+    SYSTEM = "system"
+
+
+class MessageProvider(str, enum.Enum):
+    TWILIO = "twilio"
+    META = "meta"
+    NONE = "none"
+
+
+class DeliveryStatus(str, enum.Enum):
+    QUEUED = "queued"
+    SENT = "sent"
+    DELIVERED = "delivered"
+    READ = "read"
+    FAILED = "failed"
+
+
+class ChannelKind(str, enum.Enum):
+    WHATSAPP = "whatsapp"
+
+
 def utcnow() -> datetime:
     return datetime.utcnow()
 
@@ -91,6 +148,8 @@ class Workspace(Base):
     agents: Mapped[list["Agent"]] = relationship(back_populates="workspace")
     workflows: Mapped[list["Workflow"]] = relationship(back_populates="workspace")
     workflow_runs: Mapped[list["WorkflowRun"]] = relationship(back_populates="workspace")
+    conversations: Mapped[list["Conversation"]] = relationship(back_populates="workspace")
+    channel_bindings: Mapped[list["ChannelBinding"]] = relationship(back_populates="workspace")
 
 
 class AgentTemplate(Base):
@@ -214,7 +273,7 @@ class Handoff(Base):
     to_task_id: Mapped[int] = mapped_column(Integer, ForeignKey("tasks.id"), index=True)
     from_agent_id: Mapped[int] = mapped_column(Integer, ForeignKey("agents.id"), index=True)
     to_agent_id: Mapped[int] = mapped_column(Integer, ForeignKey("agents.id"), index=True)
-    metadata: Mapped[dict] = mapped_column(JSON, default=dict)
+    metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
@@ -251,7 +310,97 @@ class ActivityLog(Base):
 
     event_type: Mapped[str] = mapped_column(String(100), index=True)
     message: Mapped[str] = mapped_column(Text)
-    metadata: Mapped[dict] = mapped_column(JSON, default=dict)
+    metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(Integer, ForeignKey("workspaces.id"), index=True)
+    workspace: Mapped["Workspace"] = relationship(back_populates="conversations")
+    type: Mapped[ConversationType] = mapped_column(SAEnum(ConversationType), default=ConversationType.DIRECT, index=True)
+    title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    status: Mapped[ConversationStatus] = mapped_column(SAEnum(ConversationStatus), default=ConversationStatus.OPEN, index=True)
+    linked_workflow_run_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("workflow_runs.id"), index=True, nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    workspace: Mapped["Workspace"] = relationship(back_populates="conversations")
+    participants: Mapped[list["ConversationParticipant"]] = relationship(back_populates="conversation")
+    messages: Mapped[list["Message"]] = relationship(back_populates="conversation")
+    channel_bindings: Mapped[list["ChannelBinding"]] = relationship(back_populates="conversation")
+
+
+class ConversationParticipant(Base):
+    __tablename__ = "conversation_participants"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(Integer, ForeignKey("conversations.id"), index=True)
+    participant_type: Mapped[ParticipantType] = mapped_column(SAEnum(ParticipantType), index=True)
+    participant_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    external_address: Mapped[str | None] = mapped_column(String(512), nullable=True, index=True)
+    role: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
+    conversation: Mapped["Conversation"] = relationship(back_populates="participants")
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(Integer, ForeignKey("conversations.id"), index=True)
+    sender_type: Mapped[MessageSenderType] = mapped_column(SAEnum(MessageSenderType), index=True)
+    sender_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    external_sender_address: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    body_text: Mapped[str] = mapped_column(Text)
+    body_structured: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    direction: Mapped[MessageDirection] = mapped_column(SAEnum(MessageDirection), index=True)
+    channel: Mapped[MessageChannel] = mapped_column(SAEnum(MessageChannel), index=True)
+    provider: Mapped[MessageProvider] = mapped_column(SAEnum(MessageProvider), index=True)
+    provider_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    reply_to_message_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("messages.id"), nullable=True)
+    delivery_status: Mapped[DeliveryStatus | None] = mapped_column(SAEnum(DeliveryStatus), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    conversation: Mapped["Conversation"] = relationship(back_populates="messages")
+
+    __table_args__ = (UniqueConstraint("provider", "provider_message_id", name="uq_message_provider_msg_id"),)
+
+
+class ChannelBinding(Base):
+    __tablename__ = "channel_bindings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(Integer, ForeignKey("workspaces.id"), index=True)
+    channel: Mapped[ChannelKind] = mapped_column(SAEnum(ChannelKind), index=True)
+    provider: Mapped[MessageProvider] = mapped_column(SAEnum(MessageProvider), index=True)
+    external_user_address: Mapped[str] = mapped_column(String(512), index=True)
+    conversation_id: Mapped[int] = mapped_column(Integer, ForeignKey("conversations.id"), index=True)
+    agent_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("agents.id"), nullable=True)
+    metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
+    last_inbound_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_outbound_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    workspace: Mapped["Workspace"] = relationship(back_populates="channel_bindings")
+    conversation: Mapped["Conversation"] = relationship(back_populates="channel_bindings")
+
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "provider", "external_user_address", name="uq_channel_binding_workspace_provider_address"),
+    )
+
+
+class StatusCallbackDedupe(Base):
+    """Idempotency for provider status webhooks (Twilio/Meta)."""
+
+    __tablename__ = "status_callback_dedupe"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[MessageProvider] = mapped_column(SAEnum(MessageProvider), index=True)
+    dedupe_key: Mapped[str] = mapped_column(String(512), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
@@ -270,5 +419,10 @@ def model_classes() -> list[type[Base]]:
         Artifact,
         Approval,
         ActivityLog,
+        Conversation,
+        ConversationParticipant,
+        Message,
+        ChannelBinding,
+        StatusCallbackDedupe,
     ]
 

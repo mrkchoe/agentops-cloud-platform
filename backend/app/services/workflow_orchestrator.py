@@ -22,7 +22,14 @@ class WorkflowOrchestrator:
     def __init__(self) -> None:
         self.state_machine = WorkflowStateMachine()
 
-    def start_workflow_run(self, *, db: Session, workflow_id: int, user_id: int) -> int:
+    def start_workflow_run(
+        self,
+        *,
+        db: Session,
+        workflow_id: int,
+        user_id: int,
+        shared_context_extra: dict | None = None,
+    ) -> int:
         workflow = db.query(Workflow).filter(Workflow.id == workflow_id).one()
 
         participants = (
@@ -39,13 +46,17 @@ class WorkflowOrchestrator:
         coordinator = self._select_coordinator(participants)
         human_required = bool(workflow.require_human_approval) and any(a.approval_required for a in participants)
 
+        ctx: dict = {"goal": workflow.goal}
+        if shared_context_extra:
+            ctx.update(shared_context_extra)
+
         run = WorkflowRun(
             workflow_id=workflow_id,
             workspace_id=workflow.workspace_id,
             status=WorkflowStatus.PLANNING,
             current_step_index=0,
             human_approval_required=human_required,
-            shared_context={"goal": workflow.goal},
+            shared_context=ctx,
         )
         db.add(run)
         db.flush()

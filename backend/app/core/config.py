@@ -20,6 +20,23 @@ class Settings(BaseSettings):
 
     seed_demo: bool = False
 
+    # WhatsApp / messaging channels (TODO: set real values in production)
+    whatsapp_provider: str = "twilio"  # twilio | meta
+    whatsapp_webhook_verify_token: str = ""
+    whatsapp_verify_signature: bool = False  # TODO: enable when credentials are configured
+
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_whatsapp_from: str = ""
+
+    meta_whatsapp_access_token: str = ""
+    meta_whatsapp_phone_number_id: str = ""
+    meta_app_secret: str = ""
+    meta_verify_token: str = ""
+
+    default_whatsapp_workspace_id: int | None = None
+    default_whatsapp_agent_id: int | None = None
+
 
 settings = Settings()
 

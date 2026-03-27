@@ -23,7 +23,7 @@ def log_event(
             user_id=user_id,
             event_type=event_type,
             message=message,
-            metadata=metadata or {},
+            metadata_=metadata or {},
         )
     )
 

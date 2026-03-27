@@ -19,6 +19,16 @@ class AgentLLMProvider:
     def generate(self, *, agent: Agent, task_kind: TaskKind, messages: list[dict[str, str]], response_hint: str | None) -> LLMResult:
         raise NotImplementedError
 
+    def generate_conversational(
+        self,
+        *,
+        agent: Agent,
+        messages: list[dict[str, str]],
+        response_hint: str | None = "json",
+    ) -> LLMResult:
+        """Short conversational turn (chat / WhatsApp). Default JSON with reply + optional workflow escalation."""
+        raise NotImplementedError
+
 
 class MockLLMProvider(AgentLLMProvider):
     """
@@ -116,6 +126,23 @@ class MockLLMProvider(AgentLLMProvider):
         # Generic fallback: return a short text blob.
         return LLMResult(text=f"Mock output for {agent.role_title} / {task_kind}", model="mock-fallback")
 
+    def generate_conversational(
+        self,
+        *,
+        agent: Agent,
+        messages: list[dict[str, str]],
+        response_hint: str | None = "json",
+    ) -> LLMResult:
+        user_text = next((m["content"] for m in reversed(messages) if m.get("role") == "user"), "")
+        wants_workflow = "workflow" in user_text.lower() or "run" in user_text.lower()
+        payload = {
+            "reply": f"Mock assistant ({agent.name}): {user_text[:400] or 'Hello.'}",
+            "start_workflow": wants_workflow,
+            "workflow_id": None,
+            "reason": "mock conversational routing",
+        }
+        return LLMResult(text=json.dumps(payload, indent=2), model="mock-conversational")
+
 
 class OpenAILLMProvider(AgentLLMProvider):
     @retry(wait=wait_exponential(multiplier=0.5, min=0.5, max=6), stop=stop_after_attempt(3))
@@ -135,6 +162,33 @@ class OpenAILLMProvider(AgentLLMProvider):
             payload["response_format"] = {"type": "json_object"}  # best-effort when prompt asks for JSON
 
         with httpx.Client(timeout=30) as client:
+            r = client.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+            r.raise_for_status()
+            data = r.json()
+            text = data["choices"][0]["message"]["content"]
+            return LLMResult(text=text, model=model)
+
+    def generate_conversational(
+        self,
+        *,
+        agent: Agent,
+        messages: list[dict[str, str]],
+        response_hint: str | None = "json",
+    ) -> LLMResult:
+        if not settings.openai_api_key:
+            raise RuntimeError("OPENAI_API_KEY not configured")
+
+        model = "gpt-4o-mini"
+        headers = {"Authorization": f"Bearer {settings.openai_api_key}"}
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.3,
+        }
+        if response_hint:
+            payload["response_format"] = {"type": "json_object"}
+
+        with httpx.Client(timeout=45) as client:
             r = client.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
             r.raise_for_status()
             data = r.json()

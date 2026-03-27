@@ -8,4 +8,6 @@ redis
 httpx
 python-dotenv
 tenacity
+pytest
+python-multipart
 

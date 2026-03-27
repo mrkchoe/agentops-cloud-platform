@@ -16,6 +16,7 @@ from app.models.entities import (
 )
 from app.services.activity_log import log_event
 from app.services.llm import get_provider
+from app.services.messaging_workflow_hooks import notify_workflow_run_event
 from app.services.prompt_builder import PromptBuilder
 
 
@@ -121,6 +122,13 @@ class AgentExecutionService:
             metadata={"task_id": task.id, "assignment_id": assignment.id, "agent_id": agent.id, "artifact_kind": artifact_kind.value},
         )
         db.commit()
+
+        notify_workflow_run_event(
+            db,
+            run,
+            f"Workflow update: {task.kind.value} task completed.",
+            body_structured={"workflow_run_id": run.id, "task_kind": task.kind.value},
+        )
 
     @staticmethod
     def _now() -> Any:

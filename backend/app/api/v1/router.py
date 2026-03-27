@@ -39,9 +39,11 @@ from app.schemas.schemas import (
 )
 from app.services.workflow_orchestrator import WorkflowOrchestrator
 from app.services.activity_log import log_event
+from app.api.v1.messaging_routes import router as messaging_router
 
 
 router = APIRouter(prefix="/api/v1")
+router.include_router(messaging_router)
 
 
 @router.get("/agent-templates", response_model=list[AgentTemplateOut])

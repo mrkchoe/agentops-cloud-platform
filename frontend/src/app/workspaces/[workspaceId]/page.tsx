@@ -47,6 +47,12 @@ export default function WorkspacePage({ params }: { params: { workspaceId: strin
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Link
+            className="rounded-md border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-medium text-brand-900 hover:bg-brand-100"
+            href={`/workspaces/${workspaceId}/inbox`}
+          >
+            Inbox
+          </Link>
           <Link className="rounded-md border bg-white px-3 py-2 text-sm hover:bg-gray-50" href={`/workspaces/${workspaceId}/agents`}>
             Manage Agents
           </Link>

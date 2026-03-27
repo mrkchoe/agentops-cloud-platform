@@ -53,6 +53,12 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/inbox"
+            className="rounded-md border bg-white px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50"
+          >
+            Inbox
+          </Link>
           <input
             value={newWorkspaceName}
             onChange={(e) => setNewWorkspaceName(e.target.value)}

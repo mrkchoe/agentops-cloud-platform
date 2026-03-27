@@ -19,6 +19,7 @@ from app.models.entities import (
     AssignmentStatus,
 )
 from app.services.activity_log import log_event
+from app.services.messaging_workflow_hooks import notify_workflow_run_event
 
 
 class WorkflowStateMachine:
@@ -122,7 +123,7 @@ class WorkflowStateMachine:
                     to_task_id=new_task.id,
                     from_agent_id=prev_agent_id,
                     to_agent_id=agent.id,
-                    metadata={"kind": "auto_handoff"},
+                    metadata_={"kind": "auto_handoff"},
                 )
             )
             prev_task_id = new_task.id
@@ -154,6 +155,12 @@ class WorkflowStateMachine:
             metadata={"from_task_id": task.id, "to_task_id": created_tasks[0].id},
         )
         db.commit()
+        notify_workflow_run_event(
+            db,
+            run,
+            f"Workflow plan ready: {len(steps)} steps queued.",
+            body_structured={"workflow_run_id": run.id, "steps": [s.get("kind") for s in steps]},
+        )
         return first_assignment_id
 
     @staticmethod
@@ -228,6 +235,13 @@ class WorkflowStateMachine:
                 )
                 db.add(run)
                 db.commit()
+                notify_workflow_run_event(
+                    db,
+                    run,
+                    "Workflow completed successfully.",
+                    body_structured={"workflow_run_id": run.id},
+                    event_type="workflow_completed",
+                )
             else:
                 # No next task exists; mark as failed to keep operational clarity.
                 run.status = WorkflowStatus.FAILED
@@ -282,6 +296,30 @@ class WorkflowStateMachine:
                     message="Human approval requested before final deliverable.",
                     metadata={"checkpoint_kind": CheckpointKind.FINAL_DELIVERABLE.value},
                 )
+                db.flush()
+                appr = (
+                    db.query(Approval)
+                    .filter(
+                        Approval.workflow_run_id == run.id,
+                        Approval.checkpoint_kind == CheckpointKind.FINAL_DELIVERABLE,
+                        Approval.status == ApprovalStatus.PENDING,
+                    )
+                    .order_by(Approval.id.desc())
+                    .first()
+                )
+                if appr:
+                    notify_workflow_run_event(
+                        db,
+                        run,
+                        "Approval required: please review the final deliverable checkpoint in the web UI.",
+                        body_structured={
+                            "workflow_run_id": run.id,
+                            "approval_id": appr.id,
+                            "checkpoint_kind": CheckpointKind.FINAL_DELIVERABLE.value,
+                            "kind": "approval_checkpoint",
+                        },
+                        event_type="approval_checkpoint",
+                    )
 
             run.status = WorkflowStatus.AWAITING_APPROVAL
             run.current_step_index = next_task.order_index
@@ -301,7 +339,7 @@ class WorkflowStateMachine:
                 to_task_id=next_task.id,
                 from_agent_id=assignment.agent_id,
                 to_agent_id=next_assignment.agent_id,
-                metadata={"kind": "auto_handoff"},
+                metadata_={"kind": "auto_handoff"},
             )
         )
         log_event(
@@ -394,7 +432,7 @@ class WorkflowStateMachine:
                     to_task_id=finalize_task.id,
                     from_agent_id=prev_assignment.agent_id,
                     to_agent_id=finalize_assignment.agent_id,
-                    metadata={"kind": "approval_resume"},
+                    metadata_={"kind": "approval_resume"},
                 )
             )
 

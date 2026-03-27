@@ -182,3 +182,67 @@ export async function listActivityLogs(limit = 20): Promise<ActivityLog[]> {
   return apiRequest(`/activity-logs?limit=${limit}`);
 }
 
+// --- Messaging / Inbox ---
+
+export type Conversation = {
+  id: number;
+  workspace_id: number;
+  type: string;
+  title: string | null;
+  status: string;
+  linked_workflow_run_id: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConversationDetail = Conversation & {
+  primary_channel: string;
+  binding_agent_id: number | null;
+  binding_agent_name: string | null;
+  workflow_run: WorkflowRun | null;
+};
+
+export type ConversationMessage = {
+  id: number;
+  conversation_id: number;
+  sender_type: string;
+  sender_id: number | null;
+  external_sender_address: string | null;
+  body_text: string;
+  body_structured: Record<string, unknown> | null;
+  direction: string;
+  channel: string;
+  provider: string;
+  provider_message_id: string | null;
+  reply_to_message_id: number | null;
+  delivery_status: string | null;
+  created_at: string;
+};
+
+export async function listConversations(workspaceId: number, limit = 50): Promise<Conversation[]> {
+  return apiRequest(`/conversations?workspace_id=${workspaceId}&limit=${limit}`);
+}
+
+export async function getConversation(conversationId: number): Promise<ConversationDetail> {
+  return apiRequest(`/conversations/${conversationId}`);
+}
+
+export async function listConversationMessages(conversationId: number, limit = 200): Promise<ConversationMessage[]> {
+  return apiRequest(`/conversations/${conversationId}/messages?limit=${limit}`);
+}
+
+export async function postConversationMessage(
+  conversationId: number,
+  payload: { body_text: string; body_structured?: Record<string, unknown> | null }
+): Promise<ConversationMessage> {
+  return apiRequest(`/conversations/${conversationId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      body_text: payload.body_text,
+      body_structured: payload.body_structured ?? null,
+      channel: "web",
+      provider: "none",
+    }),
+  });
+}
+

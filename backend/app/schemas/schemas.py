@@ -7,6 +7,13 @@ from app.models.entities import (
     ArtifactKind,
     ApprovalStatus,
     CheckpointKind,
+    ConversationStatus,
+    ConversationType,
+    DeliveryStatus,
+    MessageChannel,
+    MessageDirection,
+    MessageProvider,
+    MessageSenderType,
     TaskKind,
     TaskStatus,
     AssignmentStatus,
@@ -156,10 +163,10 @@ class ActivityLogOut(BaseModel):
     user_id: int
     event_type: str
     message: str
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict, validation_alias="metadata_")
     created_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
 
 class WorkflowRunOut(BaseModel):
@@ -185,4 +192,60 @@ class WorkflowRunDetailOut(BaseModel):
     artifacts: list[ArtifactOut]
     approvals: list[ApprovalOut]
     activity_logs: list[ActivityLogOut]
+
+
+# --- Messaging / conversations ---
+
+
+class ConversationOut(BaseModel):
+    id: int
+    workspace_id: int
+    type: ConversationType
+    title: str | None = None
+    status: ConversationStatus
+    linked_workflow_run_id: int | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ConversationDetailOut(ConversationOut):
+    """Conversation with channel binding, linked agent, and optional workflow run summary."""
+
+    primary_channel: str = "web"  # whatsapp | web
+    binding_agent_id: int | None = None
+    binding_agent_name: str | None = None
+    workflow_run: WorkflowRunOut | None = None
+
+
+class ConversationCreateIn(BaseModel):
+    title: str | None = None
+    type: ConversationType = ConversationType.DIRECT
+
+
+class MessageOut(BaseModel):
+    id: int
+    conversation_id: int
+    sender_type: MessageSenderType
+    sender_id: int | None = None
+    external_sender_address: str | None = None
+    body_text: str
+    body_structured: dict[str, Any] | None = None
+    direction: MessageDirection
+    channel: MessageChannel
+    provider: MessageProvider
+    provider_message_id: str | None = None
+    reply_to_message_id: int | None = None
+    delivery_status: DeliveryStatus | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class MessageCreateIn(BaseModel):
+    body_text: str
+    body_structured: dict[str, Any] | None = None
+    channel: MessageChannel = MessageChannel.WEB
+    provider: MessageProvider = MessageProvider.NONE
 
